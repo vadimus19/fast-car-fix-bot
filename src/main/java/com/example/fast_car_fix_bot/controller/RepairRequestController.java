@@ -13,7 +13,7 @@ public class RepairRequestController {
 
     private final RepairRequestRepository repository;
 
-    @Autowired
+    @Autowired // если в классе 1 конструктор, то @Autowired можно убрать
     public RepairRequestController(RepairRequestRepository repository) {
         this.repository = repository;
     }

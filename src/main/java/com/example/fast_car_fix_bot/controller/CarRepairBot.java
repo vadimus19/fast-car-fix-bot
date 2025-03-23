@@ -25,21 +25,23 @@ import java.util.List;
 
 @Slf4j
 @Component
-public class CarRepairBot extends TelegramLongPollingBot {
-    private final RepairService repairService;
+public class CarRepairBot extends TelegramLongPollingBot { // для этого класса нужен отдельный пакет, к контроллерам его лучше не относить
+    private final RepairService repairService; // это поле не используется
     private final ServiceCenterRepository serviceCenterRepository;
 
     @Value("${telegram.bot.token}")
-    private String botToken;
+    private String botToken; // это поле не используется
 
     @Value("${telegram.bot.username}")
-    private String botUsername;
+    private String botUsername; // это поле не используется
 
-    private final java.util.Map<Long, Step> userSteps = new java.util.HashMap<>();
+    // у тебя не используются
+    private final java.util.Map<Long, Step> userSteps = new java.util.HashMap<>(); // java.util. - этот префикс всегда убирай и добавляй импорт
     private final java.util.Map<Long, String> userDescriptions = new java.util.HashMap<>();
     private final java.util.Map<Long, String> userProblems = new java.util.HashMap<>();
 
     @Autowired
+    // @Lazy - скопировал откуда-то или специально поставил эту аннотацию?
     public CarRepairBot(@Lazy RepairService repairService, ServiceCenterRepository serviceCenterRepository) {
         this.repairService = repairService;
         this.serviceCenterRepository = serviceCenterRepository;
@@ -48,7 +50,7 @@ public class CarRepairBot extends TelegramLongPollingBot {
     @Override
     public String getBotUsername() {
         return botUsername;
-    }
+    } // getters/setters не обязательно всегда создать. Только если тебе необходимо где-то название бота
 
     @Override
     public String getBotToken() {
@@ -58,7 +60,7 @@ public class CarRepairBot extends TelegramLongPollingBot {
     @Override
     public void onRegister() {
         super.onRegister();
-        log.info("✅ Bot {} successfully registered with the Telegram API!", botUsername);
+        log.info("✅ Bot {} successfully registered with the Telegram API!", botUsername); // ✅ - это красиво, но такие знаки лучше не использовать. Т.к. в разной кодировке могут быть неожиданностей
     }
 
     @Override
@@ -68,7 +70,7 @@ public class CarRepairBot extends TelegramLongPollingBot {
             Long chatId = message.getChatId();
             String text = message.getText();
 
-            if (text != null && !text.trim().isEmpty()) {
+            if (text != null && !text.trim().isEmpty()) { // можно заменить на StringUtils.isNotEmpty()
                 if ("/start".equals(text)) {
                     sendTextMessage(chatId, "Welcome! Please share your location to continue.");
                 } else if ("back".equals(text)) {
@@ -83,15 +85,22 @@ public class CarRepairBot extends TelegramLongPollingBot {
                 sendTextMessage(chatId, "❌ The message is empty or not recognized. Please send a valid command or text.");
             }
         }
+
+        /* попробуй эту конструкцию заменить на
+        Optional.ofNullable(update)
+        .filter(item -> StringUtils.isNotEmpty(update.getMessage() ) )
+        .filter(item -> StringUtils.isNotEmpty(update.getMessage().getLocation() ) )
+        .ifPresent(item -> здесь вызов метода, который выполнит логику)
+        */
         if (update != null && update.getMessage() != null && update.getMessage().getLocation() != null) {
             double latitude = update.getMessage().getLocation().getLatitude();
             double longitude = update.getMessage().getLocation().getLongitude();
-            if (latitude != 0.0 && longitude != 0.0) {
+            if (latitude != 0.0 && longitude != 0.0) { // магические числа в константы класса
                 sendTextMessage(update.getMessage().getChatId(), "Your location: " + latitude + ", " + longitude);
                 List<ServiceCenter> nearbyCenters = serviceCenterRepository.findNearby(latitude, longitude);
                 if (!nearbyCenters.isEmpty()) {
-                    StringBuilder sb = new StringBuilder("Nearby service centers:\n");
-                    for (ServiceCenter center : nearbyCenters) {
+                    StringBuilder sb = new StringBuilder("Nearby service centers:\n"); // sb - лучше переименовать по содержимому переменной
+                    for (ServiceCenter center : nearbyCenters) { // попробуй здесь использовать stream() API у коллекций, а в конце получи нужную строку
                         sb.append(center.getName()).append(" - ").append(center.getAddress()).append("\n");
                     }
                     sendTextMessage(update.getMessage().getChatId(), sb.toString());
@@ -99,7 +108,7 @@ public class CarRepairBot extends TelegramLongPollingBot {
                     sendTextMessage(update.getMessage().getChatId(), "No nearby service centers found.");
                 }
             } else {
-                sendTextMessage(update.getMessage().getChatId(), "❌ The location data is not valid. Please send your location again.");
+                sendTextMessage(update.getMessage().getChatId(), "❌ The location data is not valid. Please send your location again."); // ❌ - красиво, но технически лучше не использовать
             }
         }
     }
@@ -116,7 +125,7 @@ public class CarRepairBot extends TelegramLongPollingBot {
         }
     }
 
-    public void sendLocationButton(Long chatId) {
+    public void sendLocationButton(Long chatId) { // метод пока не используется. *Button в конце лучше убрать
         SendMessage message = new SendMessage();
         message.setChatId(String.valueOf(chatId));
         message.setText("Please share your location:");
@@ -143,8 +152,8 @@ public class CarRepairBot extends TelegramLongPollingBot {
     }
 
     public InlineKeyboardMarkup createInlineKeyboard() {
-        InlineKeyboardButton button1 = new InlineKeyboardButton("Oil Change");
-        button1.setCallbackData("Oil Change");
+        InlineKeyboardButton button1 = new InlineKeyboardButton("Oil Change"); // OilChange в константу
+        button1.setCallbackData("Oil Change"); // button1 - changeOilButton
 
         InlineKeyboardButton button2 = new InlineKeyboardButton("Tire Change");
         button2.setCallbackData("Tire Change");
