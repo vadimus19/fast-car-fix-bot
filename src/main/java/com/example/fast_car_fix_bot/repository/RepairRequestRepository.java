@@ -6,7 +6,7 @@ import org.springframework.stereotype.Repository;
 
 import java.util.List;
 
-@Repository
+@Repository // без аннотации тоже будет работать
 public interface RepairRequestRepository extends JpaRepository<RepairRequest, Long> {
-    List<RepairRequest> findByRepairDate(String repairDate);
+    List<RepairRequest> findByRepairDate(String repairDate); // метод не используется
 }

@@ -1,6 +1,5 @@
 package com.example.fast_car_fix_bot.controller;
 
-import com.example.fast_car_fix_bot.entity.RepairRequest;
 import com.example.fast_car_fix_bot.repository.RepairService;
 import com.example.fast_car_fix_bot.repository.ServiceCenterRepository;
 import com.example.fast_car_fix_bot.service.ServiceCenter;
@@ -22,7 +21,6 @@ import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.Keyboard
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 
 @Slf4j
@@ -37,9 +35,9 @@ public class CarRepairBot extends TelegramLongPollingBot {
     @Value("${telegram.bot.username}")
     private String botUsername;
 
-    private final java.util.Map<Long, Step> userSteps = new HashMap<>();
-    private final java.util.Map<Long, String> userDescriptions = new HashMap<>();
-    private final java.util.Map<Long, String> userProblems = new HashMap<>();
+    private final java.util.Map<Long, Step> userSteps = new java.util.HashMap<>();
+    private final java.util.Map<Long, String> userDescriptions = new java.util.HashMap<>();
+    private final java.util.Map<Long, String> userProblems = new java.util.HashMap<>();
 
     @Autowired
     public CarRepairBot(@Lazy RepairService repairService, ServiceCenterRepository serviceCenterRepository) {
@@ -65,103 +63,50 @@ public class CarRepairBot extends TelegramLongPollingBot {
 
     @Override
     public void onUpdateReceived(Update update) {
-        // Проверяем, что обновление содержит сообщение
         if (update != null && update.getMessage() != null) {
-            // Извлекаем chatId из сообщения
-            Long chatId = update.getMessage().getChatId();
-            String text = update.getMessage().getText();
+            Message message = update.getMessage();
+            Long chatId = message.getChatId();
+            String text = message.getText();
 
-            // Проверяем, что текст сообщения не пустой
             if (text != null && !text.trim().isEmpty()) {
                 if ("/start".equals(text)) {
-                    sendTextMessage(String.valueOf(chatId), "Welcome! Please share your location to continue.");
+                    sendTextMessage(chatId, "Welcome! Please share your location to continue.");
                 } else if ("back".equals(text)) {
-                    sendTextMessage(String.valueOf(chatId), "Please choose an issue using the buttons below.");
-                    sendInlineKeyboard(String.valueOf(chatId));  // Отправка inline клавиатуры
+                    sendTextMessage(chatId, "Please choose an issue using the buttons below.");
+                    sendInlineKeyboard(chatId);  // Отправка inline клавиатуры
                 } else if ("Submit Request".equals(text)) {
-                    sendTextMessage(String.valueOf(chatId), "Your request has been submitted!");
+                    sendTextMessage(chatId, "Your request has been submitted!");
                 } else {
-                    sendTextMessage(String.valueOf(chatId), "Sorry, I didn't understand that.");
+                    sendTextMessage(chatId, "Sorry, I didn't understand that.");
                 }
             } else {
-                sendTextMessage(String.valueOf(chatId), "❌ The message is empty or not recognized. Please send a valid command or text.");
+                sendTextMessage(chatId, "❌ The message is empty or not recognized. Please send a valid command or text.");
             }
-
-            // Обработка локации
-            if (update.getMessage().getLocation() != null) {
-                double latitude = update.getMessage().getLocation().getLatitude();
-                double longitude = update.getMessage().getLocation().getLongitude();
-
-                if (latitude != 0.0 && longitude != 0.0) {
-                    log.info("Received location: Latitude = {}, Longitude = {}", latitude, longitude);
-                    sendTextMessage(String.valueOf(chatId), "Your location: " + latitude + ", " + longitude);
-
-                    try {
-                        // Ищем ближайшие сервисные центры
-                        List<ServiceCenter> nearbyCenters = serviceCenterRepository.findNearby(latitude, longitude);
-                        if (!nearbyCenters.isEmpty()) {
-                            StringBuilder sb = new StringBuilder("Nearby service centers:\n");
-                            for (ServiceCenter center : nearbyCenters) {
-                                sb.append(center.getName()).append(" - ").append(center.getAddress()).append("\n");
-                            }
-                            sendTextMessage(String.valueOf(chatId), sb.toString());
-                        } else {
-                            sendTextMessage(String.valueOf(chatId), "No nearby service centers found.");
-                            sendTextMessage(String.valueOf(chatId), "Please enter your city manually.");
-                            userSteps.put(Long.valueOf(String.valueOf(chatId)), Step.CHOOSING_CITY); // Сохраняем шаг
-                        }
-                    } catch (Exception e) {
-                        log.error("Error fetching nearby service centers: ", e);
-                        sendTextMessage(String.valueOf(chatId), "❌ An error occurred while fetching nearby service centers. Please try again later.");
-                        sendTextMessage(String.valueOf(chatId), "Please enter your city manually.");
-                        userSteps.put(Long.valueOf(String.valueOf(chatId)), Step.CHOOSING_CITY);
+        }
+        if (update != null && update.getMessage() != null && update.getMessage().getLocation() != null) {
+            double latitude = update.getMessage().getLocation().getLatitude();
+            double longitude = update.getMessage().getLocation().getLongitude();
+            if (latitude != 0.0 && longitude != 0.0) {
+                sendTextMessage(update.getMessage().getChatId(), "Your location: " + latitude + ", " + longitude);
+                List<ServiceCenter> nearbyCenters = serviceCenterRepository.findNearby(latitude, longitude);
+                if (!nearbyCenters.isEmpty()) {
+                    StringBuilder sb = new StringBuilder("Nearby service centers:\n");
+                    for (ServiceCenter center : nearbyCenters) {
+                        sb.append(center.getName()).append(" - ").append(center.getAddress()).append("\n");
                     }
+                    sendTextMessage(update.getMessage().getChatId(), sb.toString());
                 } else {
-                    sendTextMessage(String.valueOf(chatId), "❌ The location data is not valid. Please send your location again.");
+                    sendTextMessage(update.getMessage().getChatId(), "No nearby service centers found.");
                 }
-            }
-
-            // Если пользователь вводит город вручную
-            // Если пользователь вводит город вручную
-            if (userSteps.containsKey(String.valueOf(chatId)) && userSteps.get(String.valueOf(chatId)) == Step.CHOOSING_CITY) {
-                String city = update.getMessage().getText();
-                log.info("User entered city: {}", city);
-
-                // В данном случае принимаем любой город
-                sendTextMessage(String.valueOf(chatId), "City: " + city + " received. Please select a problem:");
-
-                // Переходим к выбору проблемы
-                sendInlineKeyboard(String.valueOf(chatId));
-                userSteps.put(Long.valueOf(String.valueOf(chatId)), Step.CHOOSING_PROBLEM); // Переход к следующему шагу
-            }
-
-            // Если пользователь выбирает проблему и вводит описание
-            if (userSteps.containsKey(String.valueOf(chatId)) && userSteps.get(String.valueOf(chatId)) == Step.CHOOSING_PROBLEM) {
-                String selectedProblem = update.getMessage().getText();
-                userProblems.put(Long.valueOf(String.valueOf(chatId)), selectedProblem); // Сохраняем выбранную проблему
-
-                sendTextMessage(String.valueOf(chatId), "You selected: " + selectedProblem + ". Please provide a description.");
-                userSteps.put(Long.valueOf(String.valueOf(chatId)), Step.TYPING_DESCRIPTION); // Переход к следующему шагу
-            }
-
-            // Если пользователь вводит описание проблемы
-            if (userSteps.containsKey(String.valueOf(chatId)) && userSteps.get(String.valueOf(chatId)) == Step.TYPING_DESCRIPTION) {
-                String description = update.getMessage().getText();
-                userDescriptions.put(Long.valueOf(String.valueOf(chatId)), description); // Сохраняем описание
-
-                sendTextMessage(String.valueOf(chatId), "Your description: " + description + ". Please wait while your request is processed.");
-
-                // Отправка на обработку запроса
-                repairService.processMessage(chatId, description); // Отправка запроса на обработку
-                userSteps.put(Long.valueOf(String.valueOf(chatId)), Step.REQUEST_SUBMITTED); // Переход к этапу "Запрос отправлен"
+            } else {
+                sendTextMessage(update.getMessage().getChatId(), "❌ The location data is not valid. Please send your location again.");
             }
         }
     }
 
-
-    public void sendTextMessage(String chatId, String messageText) {
+    public void sendTextMessage(Long chatId, String messageText) {
         SendMessage message = new SendMessage();
-        message.setChatId(chatId);
+        message.setChatId(String.valueOf(chatId));
         message.setText(messageText);
 
         try {
@@ -171,9 +116,9 @@ public class CarRepairBot extends TelegramLongPollingBot {
         }
     }
 
-    public void sendLocationButton(String chatId) {
+    public void sendLocationButton(Long chatId) {
         SendMessage message = new SendMessage();
-        message.setChatId(chatId);
+        message.setChatId(String.valueOf(chatId));
         message.setText("Please share your location:");
 
         KeyboardButton locationButton = new KeyboardButton("Send Location");
@@ -257,9 +202,9 @@ public class CarRepairBot extends TelegramLongPollingBot {
         return inlineKeyboardMarkup;
     }
 
-    private void sendInlineKeyboard(String chatId) {
+    private void sendInlineKeyboard(Long chatId) {
         SendMessage message = new SendMessage();
-        message.setChatId(chatId);
+        message.setChatId(String.valueOf(chatId));
         message.setText("Please choose one of the issues:");
 
         message.setReplyMarkup(createInlineKeyboard());

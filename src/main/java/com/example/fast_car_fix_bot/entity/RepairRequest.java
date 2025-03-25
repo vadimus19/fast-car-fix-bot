@@ -18,13 +18,13 @@ public class RepairRequest {
     private Long userId;
     private Long serviceCenterId;
     private String description;
-    private String repairDate;
+    private String repairDate; // String -> ZonedDateTime
     private String price;
     private String status;
 
     public RepairRequest(Long userId, String description) {
         this.userId = userId;
         this.description = description;
-        this.status = "New";
+        this.status = "New"; // само по себе поле status хороший кандидат на enum
     }
 }

@@ -9,7 +9,7 @@ import org.springframework.stereotype.Service;
 
 @Slf4j
 @Service
-@Transactional
+@Transactional // технически ок, но все методы в классе делать транзакционными не стоит. Ставь только где необходимо
 public class RepairService {
 
     private final RepairRequestRepository repairRequestRepository;
@@ -26,7 +26,7 @@ public class RepairService {
             RepairRequest request = new RepairRequest();
             request.setUserId(chatId);
             request.setDescription(message);
-            request.setStatus("New");
+            request.setStatus("New"); // хороший кандидаьт для enum
             repairRequestRepository.save(request);
 
             log.info("Request received for user {}: {}", chatId, message);
