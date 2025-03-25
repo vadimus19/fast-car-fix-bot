@@ -10,7 +10,6 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/requests")
 public class RepairRequestController {
-
     private final RepairRequestRepository repository;
 
     @Autowired

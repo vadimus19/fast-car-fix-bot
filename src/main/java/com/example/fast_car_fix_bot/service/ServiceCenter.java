@@ -19,4 +19,5 @@ public class ServiceCenter {
     private String phone;
     private double latitude;
     private double longitude;
+    private String city;
 }

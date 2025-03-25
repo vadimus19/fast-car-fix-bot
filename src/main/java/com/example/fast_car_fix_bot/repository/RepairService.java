@@ -31,11 +31,11 @@ public class RepairService {
 
             log.info("Request received for user {}: {}", chatId, message);
 
-            bot.sendTextMessage(chatId, "✅ Your request has been accepted! Please wait for a response from the auto repair shop.");
+            bot.sendTextMessage(String.valueOf(chatId), "✅ Your request has been accepted! Please wait for a response from the auto repair shop.");
 
         } catch (Exception e) {
             log.error("Error processing request: ", e);
-            bot.sendTextMessage(chatId, "❌ An error occurred while processing your request. Please try again later.");
+            bot.sendTextMessage(String.valueOf(chatId), "❌ An error occurred while processing your request. Please try again later.");
         }
     }
 }
