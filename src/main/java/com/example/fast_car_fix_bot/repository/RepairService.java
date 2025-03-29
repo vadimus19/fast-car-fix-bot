@@ -4,6 +4,8 @@ import com.example.fast_car_fix_bot.controller.CarRepairBot;
 import com.example.fast_car_fix_bot.entity.RepairRequest;
 import jakarta.transaction.Transactional;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
@@ -13,29 +15,32 @@ import org.springframework.stereotype.Service;
 public class RepairService {
 
     private final RepairRequestRepository repairRequestRepository;
+
+    @Autowired
     private final CarRepairBot bot;
 
-    public RepairService(RepairRequestRepository repairRequestRepository, CarRepairBot bot) {
+    public RepairService(RepairRequestRepository repairRequestRepository, @Lazy CarRepairBot bot) {
         this.repairRequestRepository = repairRequestRepository;
         this.bot = bot;
     }
 
     @Async
-    public void processMessage(Long chatId, String message) {
+    @Transactional
+    public void processMessage(Long chatId, String message, double latitude, double longitude) {
         try {
-            RepairRequest request = new RepairRequest();
-            request.setUserId(chatId);
-            request.setDescription(message);
-            request.setStatus("New"); // хороший кандидаьт для enum
-            repairRequestRepository.save(request);
+            // Save the repair request in the database
+            RepairRequest repairRequest = new RepairRequest(chatId, message);
+            repairRequest.setLatitude(latitude);
+            repairRequest.setLongitude(longitude);
+            repairRequestRepository.save(repairRequest);
 
-            log.info("Request received for user {}: {}", chatId, message);
+            log.info("Repair request saved for user {}: {}", chatId, message);
 
-            bot.sendTextMessage(String.valueOf(chatId), "✅ Your request has been accepted! Please wait for a response from the auto repair shop.");
-
+            // Send confirmation message to the user
+            bot.sendTextMessage(chatId, "Your request has been received! Please wait for further information.");
         } catch (Exception e) {
-            log.error("Error processing request: ", e);
-            bot.sendTextMessage(String.valueOf(chatId), "❌ An error occurred while processing your request. Please try again later.");
+            log.error("Error processing repair request for user {}: ", chatId, e);
+            bot.sendTextMessage(chatId, "An error occurred while processing your request. Please try again later.");
         }
     }
 }

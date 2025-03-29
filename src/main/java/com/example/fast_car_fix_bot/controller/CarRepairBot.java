@@ -1,9 +1,11 @@
 package com.example.fast_car_fix_bot.controller;
 
+import com.example.fast_car_fix_bot.entity.RepairRequest;
 import com.example.fast_car_fix_bot.repository.RepairService;
 import com.example.fast_car_fix_bot.repository.ServiceCenterRepository;
 import com.example.fast_car_fix_bot.service.ServiceCenter;
 import com.example.fast_car_fix_bot.service.Step;
+import io.micrometer.common.util.StringUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -20,14 +22,15 @@ import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.Keyboard
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardRow;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Component
-public class CarRepairBot extends TelegramLongPollingBot {
-    private final RepairService repairService;
+public class CarRepairBot extends TelegramLongPollingBot { // для этого класса нужен отдельный пакет, к контроллерам его лучше не относить
+
     private final ServiceCenterRepository serviceCenterRepository;
+    private final RepairService repairService;
 
     @Value("${telegram.bot.token}")
     private String botToken;
@@ -35,14 +38,20 @@ public class CarRepairBot extends TelegramLongPollingBot {
     @Value("${telegram.bot.username}")
     private String botUsername;
 
-    private final java.util.Map<Long, Step> userSteps = new java.util.HashMap<>();
-    private final java.util.Map<Long, String> userDescriptions = new java.util.HashMap<>();
-    private final java.util.Map<Long, String> userProblems = new java.util.HashMap<>();
+    private static final String OIL_CHANGE = "Oil Change";
+    private static final String TIRE_CHANGE = "Tire Change";
+    private static final String ELECTRICIAN = "Electrician";
+    private static final String GLASS_REPLACEMENT = "Glass Replacement";
+    private static final String CHASSIS_DIAGNOSTICS = "Chassis Diagnostics";
+    private static final String ENGINE_DIAGNOSTICS = "Engine Diagnostics";
+    private static final String TOWING = "Towing";
+
+    private Map<Long, String> problemDescriptions = new HashMap<>(); // For storing problem descriptions by chatId
 
     @Autowired
-    public CarRepairBot(@Lazy RepairService repairService, ServiceCenterRepository serviceCenterRepository) {
-        this.repairService = repairService;
+    public CarRepairBot(ServiceCenterRepository serviceCenterRepository, @Lazy RepairService repairService) {
         this.serviceCenterRepository = serviceCenterRepository;
+        this.repairService = repairService;
     }
 
     @Override
@@ -58,64 +67,110 @@ public class CarRepairBot extends TelegramLongPollingBot {
     @Override
     public void onRegister() {
         super.onRegister();
-        log.info("✅ Bot {} successfully registered with the Telegram API!", botUsername);
+        log.info("Bot {} successfully registered with the Telegram API!", botUsername);
     }
 
     @Override
     public void onUpdateReceived(Update update) {
-        if (update != null && update.getMessage() != null) {
-            Message message = update.getMessage();
-            Long chatId = message.getChatId();
-            String text = message.getText();
+        if (update == null) {
+            return;
+        }
 
-            if (text != null && !text.trim().isEmpty()) {
-                if ("/start".equals(text)) {
-                    sendTextMessage(chatId, "Welcome! Please share your location to continue.");
-                } else if ("back".equals(text)) {
-                    sendTextMessage(chatId, "Please choose an issue using the buttons below.");
-                    sendInlineKeyboard(chatId);  // Отправка inline клавиатуры
-                } else if ("Submit Request".equals(text)) {
-                    sendTextMessage(chatId, "Your request has been submitted!");
-                } else {
-                    sendTextMessage(chatId, "Sorry, I didn't understand that.");
+        // Обработка текстовых сообщений
+        if (update.getMessage() != null && update.getMessage().getText() != null) {
+            String text = update.getMessage().getText();
+            Long chatId = update.getMessage().getChatId();
+
+            if (StringUtils.isNotEmpty(text)) {
+                // Handle commands using a switch statement
+                switch (text) {
+                    case "/start":
+                        sendTextMessage(chatId, "Welcome! Please choose a problem from the options below.");
+                        sendInlineKeyboard(chatId); // Send inline keyboard
+                        break;
+                    case "back":
+                        sendTextMessage(chatId, "Please choose an issue using the buttons below.");
+                        sendInlineKeyboard(chatId); // Send inline keyboard
+                        break;
+                    case "Submit Request":
+                        sendTextMessage(chatId, "Your request has been submitted!");
+                        break;
+                    default:
+                        sendTextMessage(chatId, "Sorry, I didn't understand that.");
+                        break;
                 }
             } else {
                 sendTextMessage(chatId, "❌ The message is empty or not recognized. Please send a valid command or text.");
             }
         }
-        if (update != null && update.getMessage() != null && update.getMessage().getLocation() != null) {
-            double latitude = update.getMessage().getLocation().getLatitude();
-            double longitude = update.getMessage().getLocation().getLongitude();
-            if (latitude != 0.0 && longitude != 0.0) {
-                sendTextMessage(update.getMessage().getChatId(), "Your location: " + latitude + ", " + longitude);
-                List<ServiceCenter> nearbyCenters = serviceCenterRepository.findNearby(latitude, longitude);
-                if (!nearbyCenters.isEmpty()) {
-                    StringBuilder sb = new StringBuilder("Nearby service centers:\n");
-                    for (ServiceCenter center : nearbyCenters) {
-                        sb.append(center.getName()).append(" - ").append(center.getAddress()).append("\n");
-                    }
-                    sendTextMessage(update.getMessage().getChatId(), sb.toString());
-                } else {
-                    sendTextMessage(update.getMessage().getChatId(), "No nearby service centers found.");
-                }
-            } else {
-                sendTextMessage(update.getMessage().getChatId(), "❌ The location data is not valid. Please send your location again.");
+
+        // Обработка callback запросов (кнопки)
+        if (update.hasCallbackQuery()) {
+            String callbackData = update.getCallbackQuery().getData();
+            Long chatId = update.getCallbackQuery().getMessage().getChatId();
+
+            // Handle problem selection through buttons
+            switch (callbackData) {
+                case OIL_CHANGE:
+                case TIRE_CHANGE:
+                case ELECTRICIAN:
+                case GLASS_REPLACEMENT:
+                case CHASSIS_DIAGNOSTICS:
+                case ENGINE_DIAGNOSTICS:
+                case TOWING:
+                    sendTextMessage(chatId, "You have selected '" + callbackData + "'. Please describe the issue.");
+                    problemDescriptions.put(chatId, callbackData); // Save selected problem
+                    break;
+                case "back":
+                    sendTextMessage(chatId, "Going back.");
+                    sendInlineKeyboard(chatId); // Send inline keyboard
+                    break;
+                case "submit":
+                    sendTextMessage(chatId, "Your request has been submitted!");
+                    break;
+                default:
+                    sendTextMessage(chatId, "Sorry, I didn't understand that.");
+                    break;
             }
         }
-    }
 
-    public void sendTextMessage(Long chatId, String messageText) {
-        SendMessage message = new SendMessage();
-        message.setChatId(String.valueOf(chatId));
-        message.setText(messageText);
+        // Обработка текстовых сообщений с описанием проблемы
+        if (update.getMessage() != null && update.getMessage().getText() != null && !update.getMessage().getText().isEmpty()) {
+            String messageText = update.getMessage().getText();
+            Long chatId = update.getMessage().getChatId();
 
-        try {
-            execute(message);
-        } catch (TelegramApiException e) {
-            log.error("Error sending message in Telegram: ", e);
+            // If this is a problem description, ask to send location
+            if (problemDescriptions.containsKey(chatId) && messageText.length() > 0) {
+                sendTextMessage(chatId, "Description received! Now please send your location.");
+                sendLocationButton(chatId); // Show button for location
+            }
         }
+
+        // Обработка сообщений с локацией
+        Optional.ofNullable(update)
+                .map(Update::getMessage)
+                .map(Message::getLocation)
+                .filter(location -> location.getLatitude() != 0.0 && location.getLongitude() != 0.0)
+                .ifPresent(location -> {
+                    double latitude = location.getLatitude();
+                    double longitude = location.getLongitude();
+                    sendTextMessage(update.getMessage().getChatId(), "Your location: " + latitude + ", " + longitude);
+                    List<ServiceCenter> nearbyCenters = serviceCenterRepository.findNearby(latitude, longitude);
+                    if (!nearbyCenters.isEmpty()) {
+                        String nearbyCentersInfo = nearbyCenters.stream()
+                                .map(center -> center.getName() + " - " + center.getAddress())
+                                .collect(Collectors.joining("\n", "Nearby service centers:\n", ""));
+                        sendTextMessage(update.getMessage().getChatId(), nearbyCentersInfo);
+                    } else {
+                        sendTextMessage(update.getMessage().getChatId(), "No nearby service centers found.");
+                    }
+
+                    // After sending location, show "Submit Request" button
+                    sendSubmitButton(update.getMessage().getChatId());
+                });
     }
 
+    // Method to send location button
     public void sendLocationButton(Long chatId) {
         SendMessage message = new SendMessage();
         message.setChatId(String.valueOf(chatId));
@@ -142,33 +197,55 @@ public class CarRepairBot extends TelegramLongPollingBot {
         }
     }
 
-    public InlineKeyboardMarkup createInlineKeyboard() {
-        InlineKeyboardButton button1 = new InlineKeyboardButton("Oil Change");
-        button1.setCallbackData("Oil Change");
-
-        InlineKeyboardButton button2 = new InlineKeyboardButton("Tire Change");
-        button2.setCallbackData("Tire Change");
-
-        InlineKeyboardButton button3 = new InlineKeyboardButton("Electrician");
-        button3.setCallbackData("Electrician");
-
-        InlineKeyboardButton button4 = new InlineKeyboardButton("Glass Replacement");
-        button4.setCallbackData("Glass Replacement");
-
-        InlineKeyboardButton button5 = new InlineKeyboardButton("Chassis Diagnostics");
-        button5.setCallbackData("Chassis Diagnostics");
-
-        InlineKeyboardButton button6 = new InlineKeyboardButton("Engine Diagnostics");
-        button6.setCallbackData("Engine Diagnostics");
-
-        InlineKeyboardButton button7 = new InlineKeyboardButton("Towing");
-        button7.setCallbackData("Towing");
-
-        InlineKeyboardButton backButton = new InlineKeyboardButton("Back");
-        backButton.setCallbackData("back");
+    // Method to send "Submit Request" button
+    public void sendSubmitButton(Long chatId) {
+        SendMessage message = new SendMessage();
+        message.setChatId(String.valueOf(chatId));
+        message.setText("Would you like to submit your request?");
 
         InlineKeyboardButton submitButton = new InlineKeyboardButton("Submit Request");
         submitButton.setCallbackData("submit");
+
+        List<InlineKeyboardButton> row = new ArrayList<>();
+        row.add(submitButton);
+
+        List<List<InlineKeyboardButton>> keyboard = new ArrayList<>();
+        keyboard.add(row);
+
+        InlineKeyboardMarkup inlineKeyboardMarkup = new InlineKeyboardMarkup();
+        inlineKeyboardMarkup.setKeyboard(keyboard);
+
+        message.setReplyMarkup(inlineKeyboardMarkup);
+
+        try {
+            execute(message);
+        } catch (TelegramApiException e) {
+            log.error("Error sending submit button: ", e);
+        }
+    }
+
+    // Method to send Inline keyboard
+    public void sendInlineKeyboard(Long chatId) {
+        InlineKeyboardButton button1 = new InlineKeyboardButton(OIL_CHANGE);
+        button1.setCallbackData(OIL_CHANGE);
+
+        InlineKeyboardButton button2 = new InlineKeyboardButton(TIRE_CHANGE);
+        button2.setCallbackData(TIRE_CHANGE);
+
+        InlineKeyboardButton button3 = new InlineKeyboardButton(ELECTRICIAN);
+        button3.setCallbackData(ELECTRICIAN);
+
+        InlineKeyboardButton button4 = new InlineKeyboardButton(GLASS_REPLACEMENT);
+        button4.setCallbackData(GLASS_REPLACEMENT);
+
+        InlineKeyboardButton button5 = new InlineKeyboardButton(CHASSIS_DIAGNOSTICS);
+        button5.setCallbackData(CHASSIS_DIAGNOSTICS);
+
+        InlineKeyboardButton button6 = new InlineKeyboardButton(ENGINE_DIAGNOSTICS);
+        button6.setCallbackData(ENGINE_DIAGNOSTICS);
+
+        InlineKeyboardButton button7 = new InlineKeyboardButton(TOWING);
+        button7.setCallbackData(TOWING);
 
         List<InlineKeyboardButton> row1 = new ArrayList<>();
         row1.add(button1);
@@ -185,34 +262,36 @@ public class CarRepairBot extends TelegramLongPollingBot {
         List<InlineKeyboardButton> row4 = new ArrayList<>();
         row4.add(button7);
 
-        List<InlineKeyboardButton> row5 = new ArrayList<>();
-        row5.add(backButton);
-        row5.add(submitButton);
-
         List<List<InlineKeyboardButton>> keyboard = new ArrayList<>();
         keyboard.add(row1);
         keyboard.add(row2);
         keyboard.add(row3);
         keyboard.add(row4);
-        keyboard.add(row5);
 
         InlineKeyboardMarkup inlineKeyboardMarkup = new InlineKeyboardMarkup();
         inlineKeyboardMarkup.setKeyboard(keyboard);
 
-        return inlineKeyboardMarkup;
-    }
-
-    private void sendInlineKeyboard(Long chatId) {
         SendMessage message = new SendMessage();
         message.setChatId(String.valueOf(chatId));
-        message.setText("Please choose one of the issues:");
+        message.setText("Please choose the issue you want to report:");
+        message.setReplyMarkup(inlineKeyboardMarkup);
 
-        message.setReplyMarkup(createInlineKeyboard());
+        try {
+            execute(message);  // Send the message with the keyboard
+        } catch (TelegramApiException e) {
+            log.error("Error sending inline keyboard: ", e);
+        }
+    }
+
+    // Method to send text messages
+    public void sendTextMessage(Long chatId, String messageText) {
+        SendMessage message = new SendMessage();
+        message.setChatId(String.valueOf(chatId));
+        message.setText(messageText);
 
         try {
             execute(message);
         } catch (TelegramApiException e) {
-            log.error("Error sending keyboard in Telegram: ", e);
+            log.error("Error sending message: ", e);
         }
-    }
-}
+    }}

@@ -1,11 +1,11 @@
 package com.example.fast_car_fix_bot.entity;
 
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
+import com.example.fast_car_fix_bot.service.RepairRequestStatus;
+import jakarta.persistence.*;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+
+import java.time.ZonedDateTime;
 
 @Entity
 @Data
@@ -18,13 +18,51 @@ public class RepairRequest {
     private Long userId;
     private Long serviceCenterId;
     private String description;
-    private String repairDate; // String -> ZonedDateTime
+    private ZonedDateTime repairDate;
     private String price;
-    private String status;
+
+    @Enumerated(EnumType.STRING)
+    private RepairRequestStatus status = RepairRequestStatus.NEW;
+
+    private double latitude;   // Добавляем поле для широты
+    private double longitude;  // Добавляем поле для долготы
 
     public RepairRequest(Long userId, String description) {
         this.userId = userId;
         this.description = description;
-        this.status = "New"; // само по себе поле status хороший кандидат на enum
+        this.status = RepairRequestStatus.NEW;
+    }
+
+    // Переопределение метода toString()
+    @Override
+    public String toString() {
+        return "RepairRequest{" +
+                "id=" + id +
+                ", userId=" + userId +
+                ", serviceCenterId=" + serviceCenterId +
+                ", description='" + description + '\'' +
+                ", repairDate=" + repairDate +
+                ", price='" + price + '\'' +
+                ", status=" + status +
+                ", latitude=" + latitude +   // Добавляем вывод широты
+                ", longitude=" + longitude + // Добавляем вывод долготы
+                '}';
+    }
+
+    // Геттеры и сеттеры для latitude и longitude
+    public double getLatitude() {
+        return latitude;
+    }
+
+    public void setLatitude(double latitude) {
+        this.latitude = latitude;
+    }
+
+    public double getLongitude() {
+        return longitude;
+    }
+
+    public void setLongitude(double longitude) {
+        this.longitude = longitude;
     }
 }

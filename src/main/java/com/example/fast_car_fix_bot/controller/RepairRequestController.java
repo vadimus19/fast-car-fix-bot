@@ -2,17 +2,17 @@ package com.example.fast_car_fix_bot.controller;
 
 import com.example.fast_car_fix_bot.entity.RepairRequest;
 import com.example.fast_car_fix_bot.repository.RepairRequestRepository;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-
+@Slf4j
 @RestController
 @RequestMapping("/api/requests")
 public class RepairRequestController {
+
     private final RepairRequestRepository repository;
 
-    @Autowired // если в классе 1 конструктор, то @Autowired можно убрать
     public RepairRequestController(RepairRequestRepository repository) {
         this.repository = repository;
     }
@@ -24,6 +24,7 @@ public class RepairRequestController {
 
     @PostMapping
     public RepairRequest createRequest(@RequestBody RepairRequest request) {
+        log.info("New repair request created: {}", request);
         return repository.save(request);
     }
 }
