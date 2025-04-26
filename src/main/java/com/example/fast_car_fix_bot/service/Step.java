@@ -1,9 +1,9 @@
 package com.example.fast_car_fix_bot.service;
 
-public enum Step { // нигде не используется
-    CHOOSING_PROBLEM,
+public enum Step {
     TYPING_DESCRIPTION,
-    CHOOSING_CITY,
-    REQUEST_SUBMITTED,
-    TYPING_CITY, SELECTING_PROBLEM, DESCRIBING_PROBLEM, SENDING_LOCATION, SUBMITTING_REQUEST,
+    SELECTING_PROBLEM,
+    DESCRIBING_ISSUE,
+    SHARING_LOCATION,
+    SUBMITTING_REQUEST
 }

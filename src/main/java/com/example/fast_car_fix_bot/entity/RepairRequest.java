@@ -1,6 +1,7 @@
 package com.example.fast_car_fix_bot.entity;
 
 import com.example.fast_car_fix_bot.service.RepairRequestStatus;
+import com.example.fast_car_fix_bot.service.Step;
 import jakarta.persistence.*;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -23,9 +24,11 @@ public class RepairRequest {
 
     @Enumerated(EnumType.STRING)
     private RepairRequestStatus status = RepairRequestStatus.NEW;
+    private double latitude;
+    private double longitude;
 
-    private double latitude;   // Добавляем поле для широты
-    private double longitude;  // Добавляем поле для долготы
+    @Enumerated(EnumType.STRING)
+    private Step currentStep;
 
     public RepairRequest(Long userId, String description) {
         this.userId = userId;
@@ -33,7 +36,6 @@ public class RepairRequest {
         this.status = RepairRequestStatus.NEW;
     }
 
-    // Переопределение метода toString()
     @Override
     public String toString() {
         return "RepairRequest{" +
@@ -44,25 +46,9 @@ public class RepairRequest {
                 ", repairDate=" + repairDate +
                 ", price='" + price + '\'' +
                 ", status=" + status +
-                ", latitude=" + latitude +   // Добавляем вывод широты
-                ", longitude=" + longitude + // Добавляем вывод долготы
+                ", latitude=" + latitude +
+                ", longitude=" + longitude +
+                ", currentStep=" + currentStep +
                 '}';
-    }
-
-    // Геттеры и сеттеры для latitude и longitude
-    public double getLatitude() {
-        return latitude;
-    }
-
-    public void setLatitude(double latitude) {
-        this.latitude = latitude;
-    }
-
-    public double getLongitude() {
-        return longitude;
-    }
-
-    public void setLongitude(double longitude) {
-        this.longitude = longitude;
     }
 }
