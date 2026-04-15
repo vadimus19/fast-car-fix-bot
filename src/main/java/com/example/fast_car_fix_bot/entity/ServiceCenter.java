@@ -1,4 +1,4 @@
-package com.example.fast_car_fix_bot.service;
+package com.example.fast_car_fix_bot.entity;
 
 import jakarta.persistence.*;
 import lombok.Getter;

@@ -1,4 +1,4 @@
-package com.example.fast_car_fix_bot.service;
+package com.example.fast_car_fix_bot.enums;
 
 public enum RepairServiceType {
     OIL_CHANGE("Oil Change"),

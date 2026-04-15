@@ -1,6 +1,6 @@
 package com.example.fast_car_fix_bot.repository;
 
-import com.example.fast_car_fix_bot.service.ServiceCenter;
+import com.example.fast_car_fix_bot.entity.ServiceCenter;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;

@@ -1,237 +1,288 @@
 package com.example.fast_car_fix_bot.TelegramBot;
 
-import com.example.fast_car_fix_bot.repository.RepairService;
-import com.example.fast_car_fix_bot.repository.ServiceCenterRepository;
-import com.example.fast_car_fix_bot.service.RepairServiceType;
-import com.example.fast_car_fix_bot.service.Step;
-import io.micrometer.common.util.StringUtils;
+import com.example.fast_car_fix_bot.entity.RepairRequest;
+import com.example.fast_car_fix_bot.entity.ServiceCenter;
+import com.example.fast_car_fix_bot.enums.RepairServiceType;
+import com.example.fast_car_fix_bot.enums.Step;
+import com.example.fast_car_fix_bot.exception.ResourceNotFoundException;
+import com.example.fast_car_fix_bot.service.RepairService;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
-import org.telegram.telegrambots.meta.api.objects.Message;
-import org.telegram.telegrambots.meta.api.objects.Update;
-import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
-import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardMarkup;
-import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
-import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardButton;
-import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardRow;
+import org.telegram.telegrambots.meta.api.objects.*;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.*;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.*;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
 
-@Slf4j
 @Component
+@Slf4j
 public class CarRepairBot extends TelegramLongPollingBot {
 
-    private final ServiceCenterRepository serviceCenterRepository;
     private final RepairService repairService;
-
-    @Value("${telegram.bot.token}")
-    private String botToken;
 
     @Value("${telegram.bot.username}")
     private String botUsername;
 
-    private Map<Long, RepairServiceType> problemDescriptions = new HashMap<>();
-    private Map<Long, Step> userSteps = new HashMap<>();
-    private Map<Long, Double> latitudeMap = new HashMap<>();
-    private Map<Long, Double> longitudeMap = new HashMap<>();
+    @Value("${telegram.bot.token}")
+    private String botToken;
 
-    @Autowired
-    public CarRepairBot(ServiceCenterRepository serviceCenterRepository, @Lazy RepairService repairService) {
-        this.serviceCenterRepository = serviceCenterRepository;
+    public CarRepairBot(RepairService repairService) {
         this.repairService = repairService;
     }
 
     @Override
-    public String getBotUsername() {
-        return botUsername;
-    }
+    public String getBotUsername() { return botUsername; }
 
     @Override
-    public String getBotToken() {
-        return botToken;
-    }
-
-    @Override
-    public void onRegister() {
-        super.onRegister();
-        log.info("Bot {} successfully registered with the Telegram API!", botUsername);
-    }
+    public String getBotToken() { return botToken; }
 
     @Override
     public void onUpdateReceived(Update update) {
-        if (update == null) {
+        if (update.hasCallbackQuery()) {
+            handleCallback(update.getCallbackQuery());
             return;
         }
-        Long chatId = update.getMessage() != null ? update.getMessage().getChatId() : update.getCallbackQuery().getMessage().getChatId();
-
-        if (update.getMessage() != null && update.getMessage().getText() != null) {
-            String text = update.getMessage().getText();
-            if (StringUtils.isNotEmpty(text)) {
-                switch (text) {
-                    case "/start":
-                        sendTextMessage(chatId, "Welcome! Please select a problem from the options below.");
-                        sendInlineKeyboard(chatId);
-                        userSteps.put(chatId, Step.SELECTING_PROBLEM);
-                        break;
-                    case "back":
-                        sendTextMessage(chatId, "Please select a problem using the buttons below.");
-                        sendInlineKeyboard(chatId);
-                        userSteps.put(chatId, Step.SELECTING_PROBLEM);
-                        break;
-                    case "Submit Request":
-                        sendTextMessage(chatId, "Your request has been submitted!");
-                        break;
-                    default:
-                        sendTextMessage(chatId, "Sorry, I didn't understand your command.");
-                        break;
+        if (update.hasMessage()) {
+            Message message = update.getMessage();
+            if (message.hasText()) {
+                if ("/start".equals(message.getText())) {
+                    showMainMenu(message.getChatId());
+                    return;
                 }
-            } else {
-                sendTextMessage(chatId, "❌ The message is empty or unrecognized. Please send a command or text.");
+                handleTextMessage(message);
+                return;
+            }
+            if (message.hasLocation()) {
+                handleLocationMessage(message);
             }
         }
-
-        if (update.hasCallbackQuery()) {
-            String callbackData = update.getCallbackQuery().getData();
-            try {
-                RepairServiceType selectedService = RepairServiceType.valueOf(callbackData);
-                problemDescriptions.put(chatId, selectedService);
-                sendTextMessage(chatId, "You selected '" + selectedService.getDescription() + "'. Please describe the problem.");
-                userSteps.put(chatId, Step.DESCRIBING_ISSUE);
-            } catch (IllegalArgumentException e) {
-                sendTextMessage(chatId, "Sorry, I didn't understand that selection.");
-            }
-        }
-
-        if (update.getMessage() != null && update.getMessage().getText() != null && !update.getMessage().getText().isEmpty()) {
-            String messageText = update.getMessage().getText();
-            if (userSteps.get(chatId) == Step.DESCRIBING_ISSUE && messageText.length() > 0) {
-                sendTextMessage(chatId, "Description received! Now, please send your location.");
-                sendLocationButton(chatId);
-                userSteps.put(chatId, Step.SHARING_LOCATION);
-            } else if (userSteps.get(chatId) == Step.DESCRIBING_ISSUE) {
-                sendTextMessage(chatId, "Please provide a description of the problem.");
-            }
-        }
-
-        Optional.ofNullable(update)
-                .map(Update::getMessage)
-                .map(Message::getLocation)
-                .filter(location -> location.getLatitude() != 0.0 && location.getLongitude() != 0.0)
-                .ifPresent(location -> {
-                    sendTextMessage(chatId, "Your location: " + location.getLatitude() + ", " + location.getLongitude());
-                    latitudeMap.put(chatId, location.getLatitude());
-                    longitudeMap.put(chatId, location.getLongitude());
-                    sendSubmitButton(chatId);
-                    userSteps.put(chatId, Step.SUBMITTING_REQUEST);
-                    String description = problemDescriptions.get(chatId).getDescription();
-                    double latitude = latitudeMap.get(chatId);
-                    double longitude = longitudeMap.get(chatId);
-
-                    repairService.processMessage(chatId, description, latitude, longitude);
-                });
     }
 
-    public void sendLocationButton(Long chatId) {
-        SendMessage message = new SendMessage();
-        message.setChatId(String.valueOf(chatId));
-        message.setText("Please send your location:");
+    private void handleCallback(CallbackQuery callbackQuery) {
+        Long chatId = callbackQuery.getMessage().getChatId();
+        String data = callbackQuery.getData();
 
-        KeyboardButton locationButton = new KeyboardButton("Send Location");
+        RepairRequest request = repairService.findActiveRequestByUser(chatId)
+                .orElseThrow(() -> new ResourceNotFoundException("No active request"));
+
+        Step step = request.getCurrentStep();
+
+        switch (step) {
+            case SELECTING_PROBLEM -> handleProblemSelection(request, chatId, data);
+            case CHOOSING_ACTION -> handleActionSelection(request, chatId, data);
+            default -> sendTextMessage(chatId, "Please follow the instructions.");
+        }
+    }
+
+    private void handleProblemSelection(RepairRequest request, Long chatId, String data) {
+        try {
+            RepairServiceType type = RepairServiceType.valueOf(data);
+            request.setServiceType(type);
+            request.setCurrentStep(Step.TYPING_DESCRIPTION);
+            repairService.saveRepairRequest(request);
+            sendTextMessage(chatId, "You selected: " + type.getDescription());
+            sendTextMessage(chatId, "Please describe your problem:");
+        } catch (IllegalArgumentException e) {
+            sendTextMessage(chatId, "Unknown problem type selected.");
+        }
+    }
+
+    private void handleActionSelection(RepairRequest request, Long chatId, String data) {
+        request.setSelectedAction(data);
+
+        switch (data) {
+            case "Get Directions" -> {
+                request.setCurrentStep(Step.SHARING_LOCATION);
+                repairService.saveRepairRequest(request);
+                sendLocationKeyboard(chatId);
+            }
+            case "Call Center" -> {
+                request.setCurrentStep(Step.SUBMITTING_REQUEST);
+                repairService.saveRepairRequest(request);
+                sendTextMessage(chatId, "Our call center will contact you shortly.");
+                showMainMenu(chatId);
+            }
+            default -> sendTextMessage(chatId, "Unknown action selected.");
+        }
+    }
+
+    private void handleTextMessage(Message message) {
+        Long chatId = message.getChatId();
+        String text = message.getText();
+
+        if ("New Request".equalsIgnoreCase(text)) {
+            startNewRequest(chatId);
+            return;
+        }
+
+        if ("Back".equalsIgnoreCase(text)) {
+            showMainMenu(chatId);
+            return;
+        }
+
+        RepairRequest request = repairService.findActiveRequestByUser(chatId).orElse(null);
+
+        if (request == null || request.getCurrentStep() == null) {
+            sendTextMessage(chatId, "Please start a new request using /start.");
+            return;
+        }
+
+        Step step = request.getCurrentStep();
+
+        if (step == Step.TYPING_DESCRIPTION) {
+            if (text.isBlank()) {
+                sendTextMessage(chatId, "Description cannot be empty.");
+                return;
+            }
+            request.setDescription(text);
+            request.setCurrentStep(Step.CHOOSING_ACTION);
+            repairService.saveRepairRequest(request);
+            showActionButtons(chatId);
+        } else {
+            sendTextMessage(chatId, "Please follow the instructions.");
+        }
+    }
+
+    private void handleLocationMessage(Message message) {
+        Long chatId = message.getChatId();
+        RepairRequest request = repairService.findActiveRequestByUser(chatId).orElse(null);
+
+        if (request == null || request.getCurrentStep() != Step.SHARING_LOCATION) {
+            sendTextMessage(chatId, "Please select 'Get Directions' first.");
+            return;
+        }
+
+        Location location = message.getLocation();
+        request.setLatitude(location.getLatitude());
+        request.setLongitude(location.getLongitude());
+        request.setCurrentStep(Step.SHOWING_NEARBY);
+        repairService.saveRepairRequest(request);
+
+        sendTextMessage(chatId, "Searching nearby service centers...");
+        showNearbyCenters(request);
+    }
+
+    private void showNearbyCenters(RepairRequest request) {
+        Long chatId = request.getUserId();
+        List<ServiceCenter> centers = repairService.findNearbyServiceCenters(
+                request.getLatitude(), request.getLongitude());
+
+        if (centers.isEmpty()) {
+            sendTextMessage(chatId, "No nearby service centers found.");
+            showMainMenu(chatId);
+            return;
+        }
+
+        StringBuilder sb = new StringBuilder("Nearby service centers:\n");
+        for (ServiceCenter c : centers) {
+            sb.append(c.getName()).append(" - ").append(c.getAddress()).append("\n");
+        }
+        sendTextMessage(chatId, sb.toString());
+        showMainMenu(chatId);
+    }
+
+    private void startNewRequest(Long chatId) {
+        RepairRequest request = new RepairRequest();
+        request.setUserId(chatId);
+        request.setCurrentStep(Step.SELECTING_PROBLEM);
+        repairService.saveRepairRequest(request);
+
+        SendMessage msg = new SendMessage();
+        msg.setChatId(String.valueOf(chatId));
+        msg.setText("Choose the type of problem:");
+
+        InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+
+        for (RepairServiceType type : RepairServiceType.values()) {
+            InlineKeyboardButton btn = new InlineKeyboardButton();
+            btn.setText(type.getDescription());
+            btn.setCallbackData(type.name());
+            rows.add(List.of(btn));
+        }
+
+        markup.setKeyboard(rows);
+        msg.setReplyMarkup(markup);
+
+        try { execute(msg); }
+        catch (TelegramApiException e) { log.error("Error sending problem buttons", e); }
+    }
+
+    private void showActionButtons(Long chatId) {
+        SendMessage msg = new SendMessage();
+        msg.setChatId(String.valueOf(chatId));
+        msg.setText("Select next action:");
+
+        InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+
+        InlineKeyboardButton callBtn = new InlineKeyboardButton();
+        callBtn.setText("Call Center");
+        callBtn.setCallbackData("Call Center");
+
+        InlineKeyboardButton directionsBtn = new InlineKeyboardButton();
+        directionsBtn.setText("Get Directions");
+        directionsBtn.setCallbackData("Get Directions");
+
+        rows.add(List.of(callBtn, directionsBtn));
+        markup.setKeyboard(rows);
+        msg.setReplyMarkup(markup);
+
+        try { execute(msg); }
+        catch (TelegramApiException e) { log.error("Error sending action buttons", e); }
+    }
+
+    private void sendLocationKeyboard(Long chatId) {
+        SendMessage msg = new SendMessage();
+        msg.setChatId(String.valueOf(chatId));
+        msg.setText("Please share your location:");
+
+        ReplyKeyboardMarkup keyboard = new ReplyKeyboardMarkup();
+        keyboard.setResizeKeyboard(true);
+        keyboard.setOneTimeKeyboard(true);
+
+        KeyboardButton locationButton = new KeyboardButton("Send location");
         locationButton.setRequestLocation(true);
 
         KeyboardRow row = new KeyboardRow();
         row.add(locationButton);
+        keyboard.setKeyboard(List.of(row));
 
-        List<KeyboardRow> keyboard = new ArrayList<>();
-        keyboard.add(row);
+        msg.setReplyMarkup(keyboard);
 
-        ReplyKeyboardMarkup keyboardMarkup = new ReplyKeyboardMarkup();
-        keyboardMarkup.setKeyboard(keyboard);
-        keyboardMarkup.setResizeKeyboard(true);
-        message.setReplyMarkup(keyboardMarkup);
-
-        try {
-            execute(message);
-        } catch (TelegramApiException e) {
-            log.error("Error sending location button: ", e);
-        }
+        try { execute(msg); }
+        catch (TelegramApiException e) { log.error("Error sending location keyboard", e); }
     }
 
-    public void sendSubmitButton(Long chatId) {
-        SendMessage message = new SendMessage();
-        message.setChatId(String.valueOf(chatId));
-        message.setText("Do you want to submit your request?");
+    private void showMainMenu(Long chatId) {
+        SendMessage msg = new SendMessage();
+        msg.setChatId(String.valueOf(chatId));
+        msg.setText("Choose an option:");
 
-        InlineKeyboardButton submitButton = new InlineKeyboardButton("Submit Request");
-        submitButton.setCallbackData("submit");
+        ReplyKeyboardMarkup keyboard = new ReplyKeyboardMarkup();
+        keyboard.setResizeKeyboard(true);
+        keyboard.setOneTimeKeyboard(true);
 
-        List<InlineKeyboardButton> row = new ArrayList<>();
-        row.add(submitButton);
+        KeyboardRow row = new KeyboardRow();
+        row.add(new KeyboardButton("New Request"));
+        keyboard.setKeyboard(List.of(row));
 
-        List<List<InlineKeyboardButton>> keyboard = new ArrayList<>();
-        keyboard.add(row);
+        msg.setReplyMarkup(keyboard);
 
-        InlineKeyboardMarkup inlineKeyboardMarkup = new InlineKeyboardMarkup();
-        inlineKeyboardMarkup.setKeyboard(keyboard);
-
-        message.setReplyMarkup(inlineKeyboardMarkup);
-
-        try {
-            execute(message);
-        } catch (TelegramApiException e) {
-            log.error("Error sending submit request button: ", e);
-        }
-    }
-
-    public void sendInlineKeyboard(Long chatId) {
-        List<InlineKeyboardButton> buttons = new ArrayList<>();
-        for (RepairServiceType service : RepairServiceType.values()) {
-            InlineKeyboardButton button = new InlineKeyboardButton(service.getDescription());
-            button.setCallbackData(service.name());
-            buttons.add(button);
-        }
-
-        List<List<InlineKeyboardButton>> keyboard = new ArrayList<>();
-        for (int i = 0; i < buttons.size(); i += 2) {
-            List<InlineKeyboardButton> row = new ArrayList<>();
-            row.add(buttons.get(i));
-            if (i + 1 < buttons.size()) {
-                row.add(buttons.get(i + 1));
-            }
-            keyboard.add(row);
-        }
-
-        InlineKeyboardMarkup inlineKeyboardMarkup = new InlineKeyboardMarkup();
-        inlineKeyboardMarkup.setKeyboard(keyboard);
-
-        SendMessage message = new SendMessage();
-        message.setChatId(String.valueOf(chatId));
-        message.setText("Please select a problem:");
-
-        message.setReplyMarkup(inlineKeyboardMarkup);
-
-        try {
-            execute(message);
-        } catch (TelegramApiException e) {
-            log.error("Error sending inline keyboard: ", e);
-        }
+        try { execute(msg); }
+        catch (TelegramApiException e) { log.error("Error showing main menu", e); }
     }
 
     public void sendTextMessage(Long chatId, String text) {
-        SendMessage message = new SendMessage();
-        message.setChatId(String.valueOf(chatId));
-        message.setText(text);
-
-        try {
-            execute(message);
-        } catch (TelegramApiException e) {
-            log.error("Error sending text message: ", e);
-        }
+        SendMessage msg = new SendMessage();
+        msg.setChatId(String.valueOf(chatId));
+        msg.setText(text);
+        try { execute(msg); }
+        catch (TelegramApiException e) { log.error("Failed to send message: {}", e.getMessage(), e); }
     }
 }
