@@ -7,6 +7,7 @@ import jakarta.persistence.*;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
 import java.time.ZonedDateTime;
 
 @Entity
@@ -19,18 +20,26 @@ public class RepairRequest {
     private Long id;
 
     private Long userId;
+
     private Long serviceCenterId;
+
     private String description;
+
     private ZonedDateTime repairDate;
-    private String price;
+
+    private BigDecimal price;
 
     private String selectedAction;
 
     @Enumerated(EnumType.STRING)
     private RepairRequestStatus status = RepairRequestStatus.NEW;
 
-    private double latitude;
-    private double longitude;
+    // ✅ ВАЖНО: координаты НЕ должны быть обязательными
+    @Column(nullable = true)
+    private Double latitude;
+
+    @Column(nullable = true)
+    private Double longitude;
 
     @Enumerated(EnumType.STRING)
     private Step currentStep;
@@ -48,23 +57,5 @@ public class RepairRequest {
         this.userId = userId;
         this.serviceType = serviceType;
         this.status = RepairRequestStatus.NEW;
-    }
-
-    @Override
-    public String toString() {
-        return "RepairRequest{" +
-                "id=" + id +
-                ", userId=" + userId +
-                ", serviceCenterId=" + serviceCenterId +
-                ", description='" + description + '\'' +
-                ", repairDate=" + repairDate +
-                ", price='" + price + '\'' +
-                ", status=" + status +
-                ", latitude=" + latitude +
-                ", longitude=" + longitude +
-                ", currentStep=" + currentStep +
-                ", serviceType=" + serviceType +
-                ", selectedAction='" + selectedAction + '\'' +
-                '}';
     }
 }

@@ -1,6 +1,6 @@
 package com.example.fast_car_fix_bot;
 
-import com.example.fast_car_fix_bot.TelegramBot.CarRepairBot;
+import com.example.fast_car_fix_bot.bot.CarRepairBot;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
