@@ -21,6 +21,7 @@ This project demonstrates a state-driven Telegram bot built with Spring Boot, in
 - Spring Data JPA
 - PostgreSQL
 - PostGIS
+- Docker
 - Telegram Bots API
 
 ## Bot Flow
@@ -36,16 +37,41 @@ This project demonstrates a state-driven Telegram bot built with Spring Boot, in
 
 - Java 17+
 - Maven
-- PostgreSQL
-- PostGIS extension enabled
+- Docker
+- Docker Compose
+- PostgreSQL with PostGIS
 
-Enable PostGIS:
+## Database (Docker)
+
+The project uses PostgreSQL with PostGIS running in Docker.
+
+Start database:
+
+docker-compose up -d
+
+Example `docker-compose.yml`:
+
+version: "3.8"
+
+services:
+  db:
+    image: postgis/postgis:15-3.3
+    container_name: fast_car_fix_db
+    restart: always
+    environment:
+      POSTGRES_DB: fast_car_fix_bot
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: docker
+    ports:
+      - "5432:5432"
+
+Enable PostGIS (if needed):
 
 CREATE EXTENSION postgis;
 
 ## Configuration
 
-Create application.yml:
+Create `application.yml`:
 
 spring:
   application:
@@ -72,7 +98,7 @@ telegram:
 
 ## Security
 
-Do not commit sensitive credentials such as bot tokens to the repository.
+Sensitive data must not be stored in the repository.
 
 Use environment variables:
 
@@ -82,17 +108,26 @@ export TELEGRAM_BOT_TOKEN=your_token
 
 git clone https://github.com/your-username/fast-car-fix-bot.git  
 cd fast-car-fix-bot  
+
+Start database:
+
+docker-compose up -d  
+
+Run application:
+
 mvn spring-boot:run  
 
 ## REST API
 
-GET /api/requests  
-Returns all repair requests.
+### Get all repair requests
 
-POST /api/requests  
-Creates a repair request.
+GET /api/requests
 
-Example request body:
+### Create a repair request
+
+POST /api/requests
+
+Example request:
 
 {
   "userId": 123,
@@ -116,24 +151,9 @@ exception/ - global exception handling
 
 - State Machine controls user interaction flow
 - Geolocation search uses PostGIS (ST_DWithin)
-- Distance calculated via Haversine formula
+- Distance calculated using Haversine formula
 - Only one active request per user
 
-## Database Notes
-
-- PostgreSQL + PostGIS required
-- Nearby search uses ST_DWithin
-- Results sorted by distance in service layer
-
-## Possible Improvements
-
-- Add authentication and user profiles
-- Add Docker support
-- Add asynchronous processing
-- Add tests
-- Improve logging and monitoring
-- Add admin panel
-
-## Vadim Danilchenko
+## Vadim Danilcheko
 
 Junior backend project built with Spring Boot and Telegram Bots API
