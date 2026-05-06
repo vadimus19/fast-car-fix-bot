@@ -13,6 +13,6 @@ public class RepairRequestCreateDto {
     @Size(min = 5, max = 500)
     private String description;
 
-    private Double latitude;   // ✅ FIX
-    private Double longitude;  // ✅ FIX
+    private Double latitude;
+    private Double longitude;
 }

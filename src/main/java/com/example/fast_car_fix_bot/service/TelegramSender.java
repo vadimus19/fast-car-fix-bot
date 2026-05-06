@@ -1,6 +1,6 @@
 package com.example.fast_car_fix_bot.service;
 
-import lombok.SneakyThrows;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.telegram.telegrambots.bots.DefaultAbsSender;
@@ -11,6 +11,7 @@ import org.telegram.telegrambots.meta.bots.AbsSender;
 
 import java.io.Serializable;
 
+@Slf4j
 @Service
 public class TelegramSender {
 
@@ -26,13 +27,20 @@ public class TelegramSender {
         };
     }
 
-    @SneakyThrows
     public void send(SendMessage message) {
-        sender.execute(message);
+        try {
+            sender.execute(message);
+        } catch (Exception e) {
+            log.error("Failed to send message", e);
+        }
     }
 
-    @SneakyThrows
     public <T extends Serializable, Method extends BotApiMethod<T>> T execute(Method method) {
-        return sender.execute(method);
+        try {
+            return sender.execute(method);
+        } catch (Exception e) {
+            log.error("Telegram API error", e);
+            return null;
+        }
     }
 }

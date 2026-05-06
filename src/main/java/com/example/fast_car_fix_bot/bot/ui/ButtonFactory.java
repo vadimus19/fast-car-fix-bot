@@ -15,28 +15,25 @@ public class ButtonFactory {
         return b;
     }
 
-    // ENUM кнопки
     public static List<List<InlineKeyboardButton>> serviceMenu() {
         return Arrays.stream(RepairServiceType.values())
                 .map(t -> List.of(button(t.getDescription(), t.name())))
                 .toList();
     }
 
-    // меню действий
     public static List<List<InlineKeyboardButton>> actionMenu() {
         return List.of(
-                List.of(button("📍 Nearby", "NEARBY")),
-                List.of(button("🔄 New request", "NEW_REQUEST")),
-                List.of(button("🏠 Main menu", "MAIN_MENU")),
-                List.of(button("⬅️ Back", "BACK"))
+                List.of(button("Nearby", "NEARBY")),
+                List.of(button("New request", "NEW_REQUEST")),
+                List.of(button("Main menu", "MAIN_MENU")),
+                List.of(button("Back", "BACK"))
         );
     }
 
-    // универсальный back
     public static List<List<InlineKeyboardButton>> backMenu() {
         return List.of(
-                List.of(button("⬅️ Back", "BACK")),
-                List.of(button("🏠 Main menu", "MAIN_MENU"))
+                List.of(button("Back", "BACK")),
+                List.of(button("Main menu", "MAIN_MENU"))
         );
     }
 }

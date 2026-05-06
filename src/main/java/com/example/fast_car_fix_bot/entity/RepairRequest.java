@@ -34,7 +34,6 @@ public class RepairRequest {
     @Enumerated(EnumType.STRING)
     private RepairRequestStatus status = RepairRequestStatus.NEW;
 
-    // ✅ ВАЖНО: координаты НЕ должны быть обязательными
     @Column(nullable = true)
     private Double latitude;
 

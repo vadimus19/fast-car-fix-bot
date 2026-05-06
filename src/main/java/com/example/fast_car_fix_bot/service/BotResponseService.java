@@ -20,8 +20,6 @@ public class BotResponseService {
         this.sender = sender;
     }
 
-    // ================= ПРОСТОЕ СООБЩЕНИЕ =================
-
     public void send(Long userId, String text) {
         SendMessage msg = new SendMessage();
         msg.setChatId(userId.toString());
@@ -29,8 +27,6 @@ public class BotResponseService {
 
         sender.send(msg);
     }
-
-    // ================= INLINE КНОПКИ =================
 
     public void sendWithButtons(Long userId,
                                 String text,
@@ -48,19 +44,15 @@ public class BotResponseService {
         sender.send(msg);
     }
 
-    // ================= КНОПКА ГЕОЛОКАЦИИ =================
-
     public void sendLocationRequest(Long userId, String text) {
 
         SendMessage msg = new SendMessage();
         msg.setChatId(userId.toString());
         msg.setText(text);
 
-        // кнопка "отправить геолокацию"
         KeyboardButton locationButton = new KeyboardButton("📍 Send location");
         locationButton.setRequestLocation(true);
 
-        // ❗ ВАЖНО: используем KeyboardRow
         KeyboardRow row = new KeyboardRow();
         row.add(locationButton);
 
@@ -73,8 +65,6 @@ public class BotResponseService {
 
         sender.send(msg);
     }
-
-    // ================= CALLBACK (убирает "часики") =================
 
     public void answerCallback(String callbackId) {
         AnswerCallbackQuery answer = new AnswerCallbackQuery();

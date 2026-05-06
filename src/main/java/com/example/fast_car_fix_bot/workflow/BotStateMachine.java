@@ -2,7 +2,9 @@ package com.example.fast_car_fix_bot.workflow;
 
 import com.example.fast_car_fix_bot.bot.ui.ButtonFactory;
 import com.example.fast_car_fix_bot.entity.RepairRequest;
-import com.example.fast_car_fix_bot.enums.*;
+import com.example.fast_car_fix_bot.enums.BotAction;
+import com.example.fast_car_fix_bot.enums.RepairServiceType;
+import com.example.fast_car_fix_bot.enums.Step;
 import com.example.fast_car_fix_bot.service.BotResponseService;
 import com.example.fast_car_fix_bot.service.NearbyService;
 import com.example.fast_car_fix_bot.service.RepairService;
@@ -27,7 +29,7 @@ public class BotStateMachine {
     public void showServiceMenu(RepairRequest req) {
         response.sendWithButtons(
                 req.getUserId(),
-                "🔧 Choose problem:",
+                "Choose problem:",
                 ButtonFactory.serviceMenu()
         );
     }
@@ -35,42 +37,51 @@ public class BotStateMachine {
     public void showActionMenu(RepairRequest req) {
         response.sendWithButtons(
                 req.getUserId(),
-                "📍 What next?",
+                "What next?",
                 ButtonFactory.actionMenu()
         );
     }
 
     public void handle(RepairRequest req, Message msg) {
-        if (req.getCurrentStep() == Step.TYPING_DESCRIPTION) {
-            handleDescription(req, msg);
+
+        switch (req.getCurrentStep()) {
+
+            case TYPING_DESCRIPTION -> handleDescription(req, msg);
+
+            default -> response.send(req.getUserId(), "Unsupported step");
         }
     }
 
     public void handleCallback(RepairRequest req, String data) {
 
-        switch (data) {
+        try {
+            BotAction action = BotAction.valueOf(data);
 
-            case "BACK" -> goBack(req);
+            switch (action) {
+                case BACK -> goBack(req);
 
-            // ✅ FIX: MAIN_MENU теперь всегда возвращает UI
-            case "MAIN_MENU" -> {
-                goMain(req);
-                showServiceMenu(req);   // 🔥 ВАЖНО: перерисовать меню
-                return;
-            }
-
-            case "NEW_REQUEST" -> newRequest(req);
-
-            case "NEARBY" -> showNearby(req);
-
-            default -> {
-                try {
-                    RepairServiceType type = RepairServiceType.valueOf(data);
-                    selectProblem(req, type);
-                } catch (Exception e) {
-                    response.send(req.getUserId(), "Unknown action");
+                case MAIN_MENU -> {
+                    goMain(req);
+                    showServiceMenu(req);
+                    return;
                 }
+
+                case NEW_REQUEST -> newRequest(req);
+
+                case NEARBY -> showNearby(req);
             }
+
+            return;
+
+        } catch (IllegalArgumentException ignored) {
+
+        }
+
+        try {
+            RepairServiceType type = RepairServiceType.valueOf(data);
+            selectProblem(req, type);
+        } catch (Exception e) {
+            response.send(req.getUserId(), "Unknown action");
         }
     }
 
@@ -83,7 +94,7 @@ public class BotStateMachine {
 
         response.sendWithButtons(
                 req.getUserId(),
-                "✍️ Describe problem:",
+                "Describe problem:",
                 ButtonFactory.backMenu()
         );
     }
@@ -95,7 +106,7 @@ public class BotStateMachine {
 
         repairService.save(req);
 
-        response.send(req.getUserId(), "📍 Send your location");
+        response.sendLocationRequest(req.getUserId(), "📍 Send your location");
     }
 
     private void showNearby(RepairRequest req) {
@@ -107,7 +118,7 @@ public class BotStateMachine {
 
         var list = nearby.findNearest(req.getLatitude(), req.getLongitude());
 
-        StringBuilder sb = new StringBuilder("📍 Nearby:\n\n");
+        StringBuilder sb = new StringBuilder("Nearby:\n\n");
 
         for (var c : list) {
             sb.append("• ").append(c.getName()).append("\n");

@@ -11,7 +11,6 @@ public interface RepairRequestRepository extends JpaRepository<RepairRequest, Lo
 
     List<RepairRequest> findByStatus(RepairRequestStatus status);
 
-    // ❗ ищем последнюю активную заявку пользователя
     Optional<RepairRequest> findFirstByUserIdAndStatusInOrderByIdDesc(
             Long userId,
             List<RepairRequestStatus> statuses

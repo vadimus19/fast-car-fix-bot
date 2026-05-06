@@ -20,8 +20,6 @@ public class RepairService {
     private final RepairRequestRepository repairRequestRepository;
     private final RepairRequestMapper mapper;
 
-    // ================= DTO =================
-
     public List<RepairRequestResponseDto> getAllRequests() {
         return repairRequestRepository.findAll()
                 .stream()
@@ -39,17 +37,13 @@ public class RepairService {
         return mapper.toDto(repairRequestRepository.save(entity));
     }
 
-    // ================= BOT FLOW =================
-
     public RepairRequest createNewRequest(Long userId) {
 
         RepairRequest request = new RepairRequest();
         request.setUserId(userId);
 
-        // ❗ ВАЖНО: иначе findActiveRequestByUser не найдёт заявку
         request.setStatus(RepairRequestStatus.IN_PROGRESS);
 
-        // стартовый шаг FSM
         request.setCurrentStep(Step.SELECTING_PROBLEM);
 
         return repairRequestRepository.save(request);
